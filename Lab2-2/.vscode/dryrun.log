@@ -1,0 +1,8 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory '/home/l123456/Desktop/Lab2-2'
+gcc -c main.c -o main.o
+gcc -c input.c -o input.o
+gcc -c compute.c -o compute.o
+gcc main.o input.o compute.o -o power -lm
+make: Leaving directory '/home/l123456/Desktop/Lab2-2'
+ 
