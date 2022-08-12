@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <signal.h>
+#include <dirent.h>
 
 using namespace std;
 
@@ -49,6 +50,7 @@ int Tail;
 void SignalDeal(int Signal);
 void InitShell(int __Argc, char **__Argv);
 string ReturnJobsInfo(int JobIndex, int Finished);
+int TimeCommpare(const timespec& Time1, const timespec& Time2);
 void UpdateJobs();
 void AnalyseCommand(string Command);
 void DealIOCommand(string DevidedCommand[], int ParaCount);
@@ -57,6 +59,10 @@ void ExecCommandCd(string DevidedCommand[], int ParaCount);
 void ExecCommandExit(string DevidedCommand[], int ParaCount);
 void ExecCommandClr(string DevidedCommand[], int ParaCount);
 void ExecCommandTime(string DevidedCommand[], int ParaCount);
+void ExecCommandPwd(string DevidedCommand[], int ParaCount);
+void ExecCommandEcho(string DevidedCommand[], int ParaCount);
+void ExecCommandDir(string DevidedCommand[], int ParaCount);
+void ExecCommandTest(string DevidedCommand[], int ParaCount);
 
 int main(int Argc, char *Argv[])
 {
@@ -143,6 +149,20 @@ void SignalDeal(int Signal)
     default:
         break;
     }
+}
+
+int TimeCommpare(const timespec& Time1, const timespec& Time2)
+{
+    if (Time1.tv_sec > Time2.tv_sec)
+        return 1;
+    else if (Time1.tv_sec < Time2.tv_sec)
+        return -1;
+    else if(Time1.tv_nsec > Time2.tv_nsec)
+        return 1;
+    else if (Time1.tv_nsec < Time2.tv_nsec)
+        return -1;
+    else
+        return 0;
 }
 
 void InitShell(int __Argc, char **__Argv)
@@ -424,12 +444,21 @@ void ExecCommand(string DevidedCommand[], int ParaCount)
             ExecCommandCd(DevidedCommand, ParaCount);
         else if (DevidedCommand[0] == "exit")
             ExecCommandExit(DevidedCommand, ParaCount);
-        else if (DevidedCommand[0] == "clr")
+        else if (DevidedCommand[0] == "clear")
             ExecCommandClr(DevidedCommand, ParaCount);
         else if (DevidedCommand[0] == "time")
             ExecCommandTime(DevidedCommand, ParaCount);
+        else if (DevidedCommand[0] == "pwd")
+            ExecCommandPwd(DevidedCommand, ParaCount);
+        else if (DevidedCommand[0] == "echo")
+            ExecCommandEcho(DevidedCommand, ParaCount);
+        else if (DevidedCommand[0] == "dir")
+            ExecCommandDir(DevidedCommand, ParaCount);
+        else if (DevidedCommand[0] == "test")
+            ExecCommandTest(DevidedCommand, ParaCount);
         
     }
+
     write(STDOUT_FILENO, InfoToStdOutput.c_str(), InfoToStdOutput.length());
     write(STDERR_FILENO, InfoToStdError.c_str(), InfoToStdError.length());
     dup2(StdInput, STDIN_FILENO);
@@ -493,10 +522,20 @@ void ExecCommandCd(string DevidedCommand[], int ParaCount)
 
 void ExecCommandExit(string DevidedCommand[], int ParaCount)
 {
-    InfoToStdOutput = "";
-    InfoToStdError = "";
-    State = 0;
-    exit(0);
+    pid_t pid = getpid();
+    if (kill(pid, SIGTERM) == -1)
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "ERROR: Can't exit shell.\n";
+        State = 1;
+    }
+    else
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "";
+        State = 0;
+    }
+    return;
 }
 
 void ExecCommandClr(string DevidedCommand[], int ParaCount)
@@ -537,6 +576,283 @@ void ExecCommandTime(string DevidedCommand[], int ParaCount)
         InfoToStdOutput = "";
         InfoToStdError = "ERROR: Too many parameters.\n";
         State = 1;
+    }
+    return;
+}
+
+void ExecCommandPwd(string DevidedCommand[], int ParaCount)
+{
+    if (ParaCount > 1)
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "ERROR: Too many parameters.\n";
+        State = 1;
+    }
+    else
+    {
+        InfoToStdOutput = CurrentPath + "\n";
+        InfoToStdError = "";
+        State = 0;
+    }
+    return;
+}
+
+void ExecCommandEcho(string DevidedCommand[], int ParaCount)
+{
+    State = 0;
+    InfoToStdOutput = "";
+    InfoToStdError = "";
+
+    for (int i = 1; i < ParaCount; ++i)
+        if (DevidedCommand[i] != "")
+            InfoToStdOutput += DevidedCommand[i] + " ";
+    
+    InfoToStdOutput += "\n";
+    return;
+}
+
+void ExecCommandDir(string DevidedCommand[], int ParaCount)
+{
+    if (ParaCount > 2)
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "ERROR: Too many parameters.\n";
+        State = 1;
+    }
+    else
+    {
+        string Temp;
+        if (ParaCount == 1)
+            Temp = CurrentPath;
+        else
+            Temp = DevidedCommand[1];
+        
+        DIR *TargetDir;
+        struct dirent *PtrToTarget;
+
+        if (!(TargetDir = opendir(Temp.c_str())))
+        {
+            InfoToStdOutput = "";
+            InfoToStdError = "ERROR: Can't open target.\n";
+            State = 1;
+        }
+        
+        while((PtrToTarget = readdir(TargetDir)) != NULL)
+        {
+            string Temp = PtrToTarget->d_name;
+            if (Temp != "." && Temp != "..")
+                InfoToStdOutput += Temp + "\n";
+        }
+        closedir(TargetDir);
+    }
+    return;
+}
+
+void ExecCommandTest(string DevidedCommand[], int ParaCount)
+{
+    int Result = 0;
+    
+    if (ParaCount < 3)
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "ERROR: Miss parameter(s).\n";
+        State = 1;
+        return;
+    }
+    else if (ParaCount > 4)
+    {
+        InfoToStdOutput = "";
+        InfoToStdError = "ERROR: Too many parameter(s).\n";
+        State = 1;
+        return;
+    }
+    else if (ParaCount == 3)
+    {
+        struct stat Src;
+        if (DevidedCommand[1] == "-e")
+        {
+            if (lstat(DevidedCommand[2].c_str(), &Src) == 0)
+                Result = 1;
+        }
+        else if (DevidedCommand[1] == "-r")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && access(DevidedCommand[1].c_str(), R_OK))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-w")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && access(DevidedCommand[1].c_str(), W_OK))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-x")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && access(DevidedCommand[1].c_str(), X_OK))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-s")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && Src.st_size)
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-d")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISDIR(Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-f")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISREG(Src.st_mode))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-c")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISCHR(Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-b")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISBLK(Src.st_mode))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-b")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISBLK(Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-h" || DevidedCommand[1] == "-L")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISLNK(Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-p")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISFIFO(Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-S")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && S_ISFIFO(Src.st_mode))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-G")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && Src.st_gid == getgid())
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-O")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && Src.st_uid == getuid())
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-g")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && (S_ISGID & Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-u")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && (S_ISUID & Src.st_mode))
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-k")
+        {
+            int flag = lstat(DevidedCommand[2].c_str(), &Src);
+            if (flag == 0 && (S_ISVTX & Src.st_mode))
+                Result = 1;
+        }
+
+        else if (DevidedCommand[1] == "-n")
+        {
+            if (DevidedCommand[2].length())
+                Result = 1;
+        }
+        
+        else if (DevidedCommand[1] == "-n")
+        {
+            if (DevidedCommand[2].length() == 0)
+            Result = 1;
+        }
+        else
+            Result = 2;
+    }
+    else if (ParaCount == 4)
+    {
+        struct stat Src1, Src2;
+        if (DevidedCommand[1] == "-ef")
+        {
+            int Ret1 = lstat(DevidedCommand[2].c_str(), &Src1);
+            int Ret2 = lstat(DevidedCommand[3].c_str(), &Src2);
+            if (Ret1 == 0 && Ret2 == 0 && Src1.st_dev == Src2.st_dev && Src1.st_ino == Src2.st_ino)
+                Result = 1;
+        }
+        else if (DevidedCommand[1] == "-nt")
+        {
+            int Ret1 = lstat(DevidedCommand[2].c_str(), &Src1);
+            int Ret2 = lstat(DevidedCommand[3].c_str(), &Src2);
+            if (Ret1 == 0 && Ret2 == 0 && TimeCommpare(Src1.st_mtim, Src2.st_mtim) == 1)
+                Result = 1;
+        }
+        else if (DevidedCommand[1] == "-ot")
+        {
+            int Ret1 = lstat(DevidedCommand[2].c_str(), &Src1);
+            int Ret2 = lstat(DevidedCommand[3].c_str(), &Src2);
+            if (Ret1 == 0 && Ret2 == 0 && TimeCommpare(Src1.st_mtim, Src2.st_mtim) == -1)
+                Result = 1;
+        }
+        else
+            Result = 2;
+    }
+    
+    switch(Result)
+    {
+        case 0:
+            InfoToStdOutput = "False.\n";
+            InfoToStdError = "";
+            State = 0;
+            break;
+        case 1:
+            InfoToStdOutput = "True.\n";
+            InfoToStdError = "";
+            State = 0;
+            break;
+        
+        case 2:
+            InfoToStdOutput = "";
+            InfoToStdError = "ERROR: Unknown opinion.\n";
+            State = 1;
+            break;
     }
     return;
 }
