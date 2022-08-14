@@ -1,0 +1,127 @@
+Myshell用户手册
+支持的指令：  bg, cd, clr, dir, echo, exec, exit, fg, help, jobs, 
+            pwd, set, test, time, umask。 其余指令被解释为外部程序调用。
+
+支持重定向：  "<", "0<"表示输入重定向；">"；
+            "1>"表示输出重定向（覆盖）； ">>", "1>>"表示输出重定向（追加）；
+            "2>"表示错误重定向（覆盖）；"2>>"表示错误重定向（追加）。
+
+支持管道符：  使用"|"分隔多条指令，前一条指令的输出是下一个指令的输入。
+            第一个指令的输入是标准输入, 最后一个指令的输出是标准输出。
+
+支持作业控制：快捷键Ctrl+Z能挂起前台作业；快捷键Ctrl+C能终止前台作业。
+            bg、fg、jobs指令的用法请查询对应的帮助手册。
+
+支持执行外部脚本：在终端中执行MyShell BashFile表示从BashFile中获取命令并执行。
+
+您可以使用help “命令名”来进一步查看对应指令的使用方法
+
+bg命令
+您可以通过bg命令将作业放到后台运行，使前台可以执行其他任务。
+调用格式如下：
+bg (NULL)               无参调用，此时将输出所有正在执行或被挂起的任务信息
+bg JobID1 JobID2 ...    有参调用，此时会将所有参数对应的任务移至后台运行
+
+cd命令
+您可以通过cd命令切换目录。
+调用格式如下：
+cd (NULL)               无参调用，此时会切换到主目录
+cd Dir                  有参调用，此时会切换到参数Dir对应的目录中
+
+clr命令
+您可以通过clr命令清屏。
+调用格式如下：
+clr (NULL)              清除终端上所有信息
+
+dir命令
+您可以通过dir命令显示目录的文件和子目录。
+调用格式如下：
+dir (NULL)              无参调用，默认列举当前目录下文件
+dir Dir                 有参调用，列举参数Dir对应的目录中的文件
+
+echo命令
+您可以通过echo命令打印出目标。
+调用格式如下：
+echo Comment             打印出参数Comment对应的内容
+
+exec命令
+您可以通过exec命令执行外部程序，需要注意的是，外部程序执行完成后会直接退出；如果您不希望外部程序执行完成完退出shell，也可以直接输入外部程序名。
+调用格式如下：
+exec Exe                 执行Exe对应的可执行文件
+
+exit命令
+您可以通过exit命令退出shell。
+调用格式如下：
+exit (NULL)             退出shell
+
+fg命令
+您可以通过fg命令将在后台运行或被挂起的作业转移到前台运行。
+调用格式如下：
+fg JobID                将参数JobID对应的任务移至前台运行
+
+set命令
+您可以通过set命令查看所有的环境变量。
+调用格式如下：
+set (NULL)              列出所有的环境变量
+
+help命令
+您可以通过help命令查看帮助手册。
+调用格式如下：
+help (NULL)             无参调用，此时会输出程序解释
+help Command            有参调用，此时会输出参数Command对应命令的使用方法
+
+jobs命令
+您可以通过jobs命令查看所有被挂起或后台运行的作业信息。
+调用格式如下：
+jobs (NULL)             输出所有被挂起或后台运行的作业信息
+
+pwd命令
+您可以通过pwd命令输出当前的路径。
+调用格式如下：
+pwd (NULL)              输出当前路径
+
+set命令
+您可以通过set命令查看当前所有环境变量信息。
+调用格式如下：
+set (NULL)              输出所有环境变量信息
+
+test命令
+您可以通过test命令校验相关信息，详细用法见调用示例。
+调用格式如下：
+
+数值测试
+-eq Int1 Int2 	    整数Int1等于整数Int2则为真
+-ne Int1 Int2	    整数Int1不等于整数Int2则为真
+-gt Int1 Int2	    整数Int1大于整数Int2则为真
+-ge Int1 Int2	    整数Int1大于等于整数Int2则为真
+-lt Int1 Int2	    整数Int1小于整数Int2则为真
+-le Int1 Int2	    整数Int1小于等于整数Int2则为真
+字符串测试
+= String1 String2       字符串String1等于字符串String2则为真
+!= String1 String2	    字符串String1不等于字符串String2则为真
+-z String               字符串String的长度为零则为真
+-n String               字符串String的长度不为零则为真
+文件测试
+-e FileName 	        如果文件FileName存在则为真
+-r FileName 	        如果文件FileName存在且可读则为真
+-w FileName 	        如果文件FileName存在且可写则为真
+-x FileName 	        如果文件FileName存在且可执行则为真
+-s FileName 	        如果文件FileName存在且至少有一个字符则为真
+-d FileName 	        如果文件FileName存在且为目录则为真
+-f FileName 	        如果文件FileName存在且为普通文件则为真
+-c FileName 	        如果文件FileName存在且为字符型特殊文件则为真
+-b FileName 	        如果文件FileName存在且为块特殊文件则为真
+-ef FileName1 FileName2 如果文件FileName1和文件FileName2 inode号相同即为真
+-nt FileName1 FileName2 如果文件FileName1最后修改时间晚于文件FileName2即为真
+-ot FileName1 FileName2 如果文件FileName1最后修改时间早于文件FileName2即为真
+
+time命令
+您可以通过time命令获取当前系统时间。
+调用格式如下：
+time (NULL)             输出系统时间
+
+umask命令
+您可以通过umask命令获取umask值或者设置umask值。
+调用格式如下：
+umask (NULL)            输出当前umask值
+umask NewUmaskValue     根据参数NewUmaskValue（一个3位的八进制数）设置umask

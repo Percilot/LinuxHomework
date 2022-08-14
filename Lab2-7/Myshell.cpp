@@ -10,6 +10,7 @@
 #include <signal.h>
 #include <dirent.h>
 #include <cstring>
+#include <fstream>
 
 using namespace std;
 
@@ -19,44 +20,44 @@ using namespace std;
 
 // 最大同时执行工作数量
 #define MAX_WORK_COUNT 1024
-// 字符串最大允许长度 
+// 字符串最大允许长度
 #define MAX_STRING_SIZE 1024
-// 最大参数个数 
+// 最大参数个数
 #define MAX_PARA_COUNT 1024
-// 判定是否是八进制数字 
+// 判定是否是八进制数字
 #define IS_OCT_DIGIT(SRC) (SRC >= '0' && SRC <= '7')
 
 /*--------------------------------------------------------------------------*/
 
 /* 全局变量定义区 */
 
-// 用于存储写入终端的信息 
+// 用于存储写入终端的信息
 char Buffer[MAX_STRING_SIZE];
-// 当前执行的指令 
+// 当前执行的指令
 string NowCommand;
-// 判定输入是否来自终端 
+// 判定输入是否来自终端
 bool IsInTerminal;
-// 判定输出是否来自终端 
+// 判定输出是否来自终端
 bool IsOutTerminal;
-// 终端输入来源 
+// 终端输入来源
 int TerminalIn;
-// 终端输出去向 
+// 终端输出去向
 int TerminalOut;
 
-// 当前指令是否能够执行状态（能否正常执行） 
+// 当前指令是否能够执行状态（能否正常执行）
 int State;
 
-// 主机名 
+// 主机名
 string HostName;
-// 用户名 
+// 用户名
 string UserName;
-// 用户主目录 
+// 用户主目录
 string HomeDir;
-// 本程序所在路径 
+// 本程序所在路径
 string ShellDir;
-// 帮助文档所在路径 
+// 帮助文档所在路径
 string HelpPath;
-// 当前路径 
+// 当前路径
 string CurrentPath;
 // 输出到标准输出的信息
 string InfoToStdOutput;
@@ -161,6 +162,9 @@ void ExecCommandUmask(string DividedCommand[], int ParaCount);
 // 处理Exec指令
 void ExecCommandExec(string DividedCommand[], int ParaCount);
 
+// 处理Help指令
+void ExecCommandHelp(string DividedCommand[], int ParaCount);
+
 /*--------------------------------------------------------------------------*/
 
 /* 主函数部分 */
@@ -201,7 +205,6 @@ int main(int Argc, char *Argv[])
     }
     return 0;
 }
-
 
 /*--------------------------------------------------------------------------*/
 
@@ -356,7 +359,7 @@ void InitShell(int __Argc, char **__Argv)
     _Argc = __Argc;
     for (int i = 0; i < __Argc; ++i)
         _Argv[i] = __Argv[i];
-    
+
     // 超过两个参数，则将标准输入重定向
     int InputSrc = -1;
     if (__Argc > 1)
@@ -387,7 +390,7 @@ void InitShell(int __Argc, char **__Argv)
     // 获取当前路径
     CurrentPath = getenv("PWD");
 
-    HelpPath = CurrentPath + "/help";
+    HelpPath = CurrentPath + "/Help";
 
     // 获取程序自身的路径
     int Length = readlink("/proc/self/exe", Buffer, MAX_STRING_SIZE);
@@ -829,7 +832,7 @@ void ExecCommand(string DividedCommand[], int ParaCount, bool WithFork)
             ExecCommandCd(DividedCommand, ParaCount);
         else if (DividedCommand[0] == "exit")
             ExecCommandExit(DividedCommand, ParaCount);
-        else if (DividedCommand[0] == "clear")
+        else if (DividedCommand[0] == "clr")
             ExecCommandClr(DividedCommand, ParaCount);
         else if (DividedCommand[0] == "time")
             ExecCommandTime(DividedCommand, ParaCount);
@@ -851,6 +854,8 @@ void ExecCommand(string DividedCommand[], int ParaCount, bool WithFork)
             ExecCommandSet(DividedCommand, ParaCount);
         else if (DividedCommand[0] == "umask")
             ExecCommandUmask(DividedCommand, ParaCount);
+        else if (DividedCommand[0] == "help")
+            ExecCommandHelp(DividedCommand, ParaCount);
         else if (DividedCommand[0] == "exec")
             // 由于exec函数的复用，所以其传参格式略有区别
             ExecCommandExec(DividedCommand + 1, ParaCount - 1);
@@ -881,7 +886,8 @@ void ExecCommand(string DividedCommand[], int ParaCount, bool WithFork)
                 {
                     // 父进程
                     // 等待子进程完成
-                    while (SonPID != -1 && !waitpid(SonPID, NULL, WNOHANG));
+                    while (SonPID != -1 && !waitpid(SonPID, NULL, WNOHANG))
+                        ;
                     SonPID = -1;
                 }
             }
@@ -1094,7 +1100,7 @@ void ExecCommandDir(string DividedCommand[], int ParaCount)
     {
         string Temp;
         if (ParaCount == 1)
-        // 无参，默认为枚举当前目录
+            // 无参，默认为枚举当前目录
             Temp = CurrentPath;
         else
             Temp = DividedCommand[1];
@@ -1565,7 +1571,7 @@ void ExecCommandExec(string DividedCommand[], int ParaCount)
         // 设置调用的参数
         char *TempArgv[ParaCount + 1] = {NULL};
         for (int i = 0; i < ParaCount; ++i)
-            TempArgv[i] = const_cast<char*>(DividedCommand[i].c_str());
+            TempArgv[i] = const_cast<char *>(DividedCommand[i].c_str());
         TempArgv[ParaCount] = NULL;
         State = 0;
         // 通过execvp执行
@@ -1573,6 +1579,134 @@ void ExecCommandExec(string DividedCommand[], int ParaCount)
         // 执行到此处即表明程序调用出错
         InfoToStdOutput = "";
         InfoToStdError = "ERROR: Can't execute.\n";
+        State = 1;
+    }
+    return;
+}
+
+void ExecCommandHelp(string DividedCommand[], int ParaCount)
+{
+    InfoToStdOutput = "";
+    InfoToStdError = "";
+    if (ParaCount <= 2)
+    {
+        int Begin, End;
+        if (ParaCount == 1)
+        {
+            Begin = 1;
+            End = 17;
+        }
+        else if (DividedCommand[1] == "bg")
+        {
+            Begin = 19;
+            End = 23;
+        }
+        else if (DividedCommand[1] == "cd")
+        {
+            Begin = 25;
+            End = 29;
+        }
+        else if (DividedCommand[1] == "clr")
+        {
+            Begin = 31;
+            End = 34;
+        }
+        else if (DividedCommand[1] == "dir")
+        {
+            Begin = 36;
+            End = 40;
+        }
+        else if (DividedCommand[1] == "echo")
+        {
+            Begin = 42;
+            End = 45;
+        }
+        else if (DividedCommand[1] == "exec")
+        {
+            Begin = 47;
+            End = 50;
+        }
+        else if (DividedCommand[1] == "exit")
+        {
+            Begin = 52;
+            End = 55;
+        }
+        else if (DividedCommand[1] == "fg")
+        {
+            Begin = 57;
+            End = 60;
+        }
+        else if (DividedCommand[1] == "set")
+        {
+            Begin = 62;
+            End = 65;
+        }
+        else if (DividedCommand[1] == "help")
+        {
+            Begin = 67;
+            End = 71;
+        }
+        else if (DividedCommand[1] == "jobs")
+        {
+            Begin = 73;
+            End = 76;
+        }
+        else if (DividedCommand[1] == "pwd")
+        {
+            Begin = 78;
+            End = 81;
+        }
+        else if (DividedCommand[1] == "set")
+        {
+            Begin = 83;
+            End = 86;
+        }
+        else if (DividedCommand[1] == "test")
+        {
+            Begin = 88;
+            End = 116;
+        }
+        else if (DividedCommand[1] == "time")
+        {
+            Begin = 118;
+            End = 121;
+        }
+        else if (DividedCommand[1] == "umask")
+        {
+            Begin = 123;
+            End = 127;
+        }
+        else
+        {
+            InfoToStdError = "ERROR: Unknown command.\n";
+            State = 1;
+            return;
+        }
+
+        int i = 0;
+        ifstream File;
+        string temp;
+        File.open(HelpPath);
+        if (!File.is_open())
+        {
+            InfoToStdError = "ERROR: Can't open file.\n";
+            State = 1;
+            return;
+        }
+        else
+        {
+            while(getline(File, temp))
+            {
+                ++i;
+                if (i >= Begin && i <= End)
+                    InfoToStdOutput += temp + "\n";
+            }
+        }
+    }
+    else
+    {
+        // 参数过多，无法执行
+        InfoToStdError = "ERROR: Too many parameters.\n";
         State = 1;
     }
     return;
